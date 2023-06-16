@@ -1,0 +1,176 @@
+from replacer_text import ReplacerText
+from PySide6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextBrowser, QLabel, QScrollArea, QComboBox, QLineEdit, QHBoxLayout, QTabWidget, QFileDialog, QDialog, QMessageBox
+from PySide6.QtUiTools import QUiLoader
+from PySide6.QtCore import QFile, QTimer
+from generator_audio import GeneratorAudio
+from player import Player
+
+if __name__ == "__main__":
+	exit()
+
+class UnitAudio:
+	def __init__(self, audio_widget):
+		self.replacer = ReplacerText()
+		self.gen_audio = GeneratorAudio()
+		self.player = Player()
+		self.audio_name = ""
+		self.audio_dir = "audio/"
+		self.audio_text = ""
+
+		self.audio_widget = audio_widget
+		self.find_all_object_qt()
+		self.rep_wid.hide()
+		self.rep_show = False
+		
+		self.audio_path_default = "Куда сохранить"
+
+		self.del_button.clicked.connect(self.delete)
+		self.rep_button.clicked.connect(self.switch_show_replace)
+		self.rep.clicked.connect(self.replace_text)
+		self.rep_reverse.clicked.connect(lambda: self.replace_text(reverse=1))
+		self.words_path.clicked.connect(self.get_patch)
+		self.rep_words.clicked.connect(lambda: self.replace_words(0))
+		self.rep_reverse_words.clicked.connect(lambda: self.replace_words(1))
+		self.play_button.clicked.connect(self.play_audio_thread)
+		self.save_audio.clicked.connect(self.save_audio_thread)
+		self.pause_sound.clicked.connect(self.pause_audio)
+		self.stop_sound.clicked.connect(self.stop_audio)
+		self.path_audio_get.clicked.connect(self.input_audio_path)
+		self.generate_progress.hide()
+		self.add_all_speaker()
+
+	def add_all_speaker(self):
+		for i in self.gen_audio.get_speakers():
+			self.speaker_audio.addItem(i)
+
+	def find_all_object_qt(self):
+		self.del_button = self.audio_widget.findChild(QPushButton, "delete_audio")
+		self.text_brow = self.audio_widget.findChild(QTextBrowser, "txt_browser")
+		self.rep_wid = self.audio_widget.findChild(QWidget, "widget_replace")
+		self.replace_in = self.audio_widget.findChild(QLineEdit, "replace_in")
+		self.replace_out = self.audio_widget.findChild(QLineEdit, "replace_out")
+		self.rep_button = self.audio_widget.findChild(QPushButton, "replace")
+		self.rep = self.audio_widget.findChild(QPushButton, "replace_button")
+		self.path_to_words = self.audio_widget.findChild(QLineEdit, "path_to_words")
+		self.rep_words = self.audio_widget.findChild(QPushButton, "replace_words")
+		self.rep_reverse = self.audio_widget.findChild(QPushButton, "replace_reverse_button")
+		self.rep_reverse_words = self.audio_widget.findChild(QPushButton, "replace_revers_words")
+		self.play_button = self.audio_widget.findChild(QPushButton, "start_audio")
+		self.path_audio_get = self.audio_widget.findChild(QPushButton, "get_path_audio")
+		self.speaker_audio = self.audio_widget.findChild(QComboBox, "speaker_audio")
+		self.tone_audio = self.audio_widget.findChild(QComboBox, "tone_audio")
+		self.speed_audio = self.audio_widget.findChild(QComboBox, "speed_audio")
+		self.audio_path = self.audio_widget.findChild(QLineEdit, "audio_path")
+		self.save_audio = self.audio_widget.findChild(QPushButton, "save_audio")
+		self.pause_sound = self.audio_widget.findChild(QPushButton, "pause_audio")
+		self.stop_sound = self.audio_widget.findChild(QPushButton, "stop_audio")
+		self.words_path = self.audio_widget.findChild(QPushButton, "words_patch")
+		self.generate_progress = self.audio_widget.findChild(QWidget, "generate_progress")
+
+	def pause_audio(self):
+		self.player.pause_audio()
+
+	def stop_audio(self):
+		self.player.stop_audio()
+
+	def get_audio_path(self):
+		return self.audio_path.text()
+
+	def input_audio_path(self):
+		audio_path = QFileDialog.getSaveFileName(self.audio_widget, filter="WAV Files (*.wav)")[0]
+		self.audio_path.setText(audio_path)
+
+	def play_audio_thread(self):
+		if self.check_mutable_text():
+			self.save_audio_thread()
+		self.player.play_audio()
+	
+	def check_mutable_text(self):
+		if self.get_text() != self.audio_text:
+			return 1
+		return 0
+
+	def save_audio_thread(self):
+		print("play_audio_thread")
+		print("text: ", self.get_text())
+		print("speaker audio: ", self.get_speaker_audio())
+		print("tone audio: ", self.tone_audio.currentText())
+		print("speed audio: ", self.speed_audio.currentText())
+		print("audio_path: ", self.audio_path.text())
+		#ADD MESSAGE BOX
+		self.audio_text = self.text_brow.toPlainText()
+		self.generate_progress.show()
+		self.gen_audio.set_audio_path(self.autogenerate_name_file())
+		self.gen_audio.thread_generate_audio(self.get_text(), self.get_speaker_audio())
+		self.generate_progress.hide()
+		#DELETE MESSAGE BOX
+		print("end")
+		self.player.set_audio_path(self.audio_path.text())
+
+
+	def autogenerate_name_file(self) -> str:
+		if self.audio_path.text() == self.audio_path_default:
+			self.audio_name = self.text_brow.toPlainText()[:10]
+			if len(self.audio_name) < 1:
+				self.audio_name = self.audio_dir + "audio.wav"
+			else:
+				self.audio_name = self.audio_dir + self.audio_name + ".wav"
+		else:
+			self.audio_name = self.audio_path.text()
+		self.audio_path.setText(self.audio_name)
+		return self.audio_name
+
+	def get_speaker_audio(self):
+		if self.speaker_audio.currentText() in self.gen_audio.get_speakers():
+			return self.speaker_audio.currentText()
+		if len(self.gen_audio.get_speakers()) > 0:
+			self.speaker_audio.setCurrentText(self.gen_audio.get_speakers()[0])
+			return self.gen_audio.get_speakers()[0]
+		self.speaker_audio.setCurrentText("aidar")
+		return "aidar"
+
+	def replace_words(self, reverse, path_to_words=0):
+		if path_to_words == 0:
+			path_to_words = self.path_to_words.text()
+		new_text = self.replacer.replace_dictonary(self.text_brow.toPlainText(),
+													path_to_words, reverse=reverse)
+		if new_text == -1:
+			self.error_message("Error dictonary")
+			return -1
+		self.text_brow.setPlainText(new_text)
+	
+	def error_message(self, text):
+		dialog = QMessageBox(parent=self.audio_widget, text=text)
+		dialog.setWindowTitle("Error")
+		dialog.exec()
+
+	def replace_text(self, reverse=0, word_in=0,
+					word_out=0):
+		if word_in == 0 or word_out == 0:
+			word_in = self.replace_in.text()
+			word_out = self.replace_out.text()
+			if reverse != 0:
+				word_in, word_out = word_out, word_in
+
+		new_text = self.replacer.replace(self.text_brow.toPlainText(),
+											word_in,
+											word_out)
+		self.text_brow.setPlainText(new_text)
+
+	def get_patch(self):
+		wd_patch = QFileDialog.getOpenFileName(self.audio_widget)[0]
+		self.path_to_words.setText(wd_patch)
+	
+	def get_text(self):
+		return self.text_brow.toPlainText()
+
+	def switch_show_replace(self):
+		if self.rep_show:
+			self.rep_wid.hide()
+			self.rep_show = False
+		else:
+			self.rep_wid.show()
+			self.rep_show = True
+
+	def delete(self):
+		self.audio_widget.deleteLater()
